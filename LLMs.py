@@ -1,24 +1,48 @@
-from zhipuai import ZhipuAI
+from openai import AsyncOpenAI
 
-# 目前仅支持智谱AI
+
 class LLMs():
-    def __init__(self, api_key:str = '', LLM:str = 'ZhipuAI', docs:list = []):
+    def __init__(self, api_key:str = '', base_url:str = '', docs:list = [], model:str=''):
         self.api_key = api_key
-        self.docs = '\n'.join(docs)
+
         if self.api_key == '':
             raise TypeError("api_key 不可以为空")
-        print(api_key)
-        self.client = ZhipuAI(api_key=api_key)
+        
+        #异步调取模型服务端
+        self.client = AsyncOpenAI(
+            api_key= self.api_key,
+            base_url=base_url
+        )
+        print(self.api_key, base_url)
+        if model == '':
+            raise TypeError("模型名称不可为空")
+        self.model = model
         #此处需要增加异常捕捉措施
 
-    #目前是RAG的格式后续需要改成常规格式，prompt将作为单独模块进行设置
-    def chat(self, question):
-        response = self.client.chat.completions.create(
-            model="glm-4-flash-250414",  # 请填写您要调用的模型名称
-            messages=[
-                {"role": "system", "content": f"用户想了解{question}。请先提炼问题的核心意思，然后结合以下知识库中的内容，给出最清晰、最准确的答案，如果没有问题的准确答案就回答:找不到准确答案，尽量减少其他多余回答"},
-                {"role":"user", "content":f"文档为{self.docs}"}
-            ],
-            stream=True,
-    )
+
+    async def chat(self, question:str, Type:str, docs:list = []):
+        try:
+            if Type == 'rag':
+                if len(docs) == 0:
+                    raise ValueError("文档不可为空")
+                response = await self.client.chat.completions.create(
+                    model= self.model,
+                    messages=[
+                        {"role": "system", "content": f"用户想了解{question}。请先提炼问题的核心意思，然后结合以下知识库中的内容，给出最清晰、最准确的答案，如果没有问题的准确答案就回答:找不到准确答案，尽量减少其他多余回答"},
+                        {"role":"user", "content":f"文档为{'\n'.join(docs)}"}
+                    ],
+                    stream=True
+            )
+            elif Type == 'normal':
+                response = await self.client.chat.completions.create(
+                    model= self.model,
+                    messages=[
+                        {"role":"user", "content":f"{question}"}
+                    ],
+                    stream=True
+            )
+        except Exception as e:
+            raise TypeError(f"{e}")
+        
         return response
+    
